@@ -128,6 +128,7 @@ class TrackedObject:
         self.stationary_since_frame = None # Processed frame number when current stationary period started
         self.is_abandoned = False
         self.abandoned_at_frame: int | None = None # New: Store frame when marked abandoned
+        self.abandoned_at_real_frame: int | None = None # New: Store frame when marked abandoned
         self.abandoned_bbox: list | None = None    # New: Store bbox when marked abandoned
         self.abandoned_reason: str | None = None   # New: Store reason
         self.display_label = class_name # Default label
@@ -236,23 +237,24 @@ class TrackedObject:
                     # Note: We don't clear self.associated_person_id here, to remember it *had* an owner.
                     # The state is now "owner (ID {self.associated_person_id}) departed at frame X"
 
-    def mark_as_abandoned(self, frame_num: int, reason: str):
+    def mark_as_abandoned(self, frame_num: int, real_processed_frame: int, reason: str):
         if not self.is_abandoned: # Mark only once
             self.is_abandoned = True
             self.abandoned_at_frame = frame_num
+            self.abandoned_at_real_frame = real_processed_frame
             self.abandoned_bbox = self.get_current_bbox() # Capture current bbox
             self.abandoned_reason = reason
             self.display_label = f"ABANDONED ({reason}) {self.class_name}"
             print(f"!!! Object ID {self.track_id} ({self.class_name}) marked as ABANDONED at frame {frame_num} (Reason: {reason}) !!!")
 
-    def check_abandonment(self, current_processed_frame: int):
+    def check_abandonment(self, current_processed_frame: int, real_processed_frame: int | None = None):
         if self.is_abandoned: return True
         if not self.is_currently_stationary: return False # Must be stationary for any abandonment rule based on it
 
         # Rule 1: Standard stationary timer (long duration)
         if self.stationary_since_frame is not None and \
            (current_processed_frame - self.stationary_since_frame) >= self.config.abandonment_duration_frames:
-            self.mark_as_abandoned(current_processed_frame, "timer")
+            self.mark_as_abandoned(current_processed_frame, real_processed_frame, "timer")
             return True
 
         # Rule 2: Person departed, and object stationary for a (potentially shorter) period since person departure
@@ -266,7 +268,7 @@ class TrackedObject:
             effective_check_start_frame = max(self.stationary_since_frame, self.person_confirmed_departed_since_frame)
 
             if (current_processed_frame - effective_check_start_frame) >= self.config.abandonment_after_person_leaves_duration_frames:
-                self.mark_as_abandoned(current_processed_frame, "person_left")
+                self.mark_as_abandoned(current_processed_frame, real_processed_frame, "person_left")
                 return True
             
         return False
@@ -307,7 +309,7 @@ class AbandonmentDetector:
     def get_abandoned_events_log(self): # New method
         return self.abandoned_events_log
 
-    def process_detections(self, detections_results, processed_frame_num: int):
+    def process_detections(self, detections_results, processed_frame_num: int, current_frame_num: int):
         current_frame_all_tracked_ids = set()
         current_frame_persons_list: list[TrackedObject] = []
 
@@ -366,7 +368,7 @@ class AbandonmentDetector:
                 if obj.has_moved_significantly:
                     if is_seen_this_frame:
                         obj.check_stationarity(processed_frame_num) # Updates obj.is_currently_stationary
-                        obj.check_abandonment(processed_frame_num)   # Uses new person association state
+                        obj.check_abandonment(processed_frame_num, current_frame_num)   # Uses new person association state
                     else: # Target object not seen this frame
                         if not obj.is_abandoned : # If it wasn't abandoned yet
                             obj.is_currently_stationary = False # Assume movement if not seen
@@ -469,9 +471,11 @@ class VideoProcessor:
                 continue
             
             processed_frames_count += 1
+            # get current frame number in the video
+            current_frame_num = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
             
             detection_results = self.detector.track_objects(frame)
-            self.abandonment_handler.process_detections(detection_results, processed_frames_count)
+            self.abandonment_handler.process_detections(detection_results, processed_frames_count, current_frame_num)
             
             if self.config.display_video:
                 output_frame = frame.copy()

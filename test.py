@@ -10,7 +10,6 @@ from main import AppConfig, VideoProcessor # Assuming main.py is in the same dir
 # 'file' is the actual model file name (e.g., yolov8n.pt)
 MODEL_CONFIGS = [
     {'name': 'yolov10l', 'type': 'YOLO', 'file': 'yolov10l.pt'}, # Example for yolov10
-    {'name': 'yolo_nas_l', 'type': 'NAS', 'file': 'yolo_nas_l.pt'}, # Example for yolov10
     {'name': 'rtdetr-l', 'type': 'RTDETR', 'file': 'rtdetr-l.pt'}, # Example for RTDETR
     {'name': 'yolo12l', 'type': 'YOLO', 'file': 'yolo12l.pt'}, 
     {'name': 'yolo11l', 'type': 'YOLO', 'file': 'yolo11l.pt'},
@@ -94,9 +93,10 @@ def run_test(videos_directory: str, results_base_dir: str = "results", model_nam
                         center_y = ((bbox[1] + bbox[3]) / 2) / video_height
                         width = (bbox[2] - bbox[0]) / video_width
                         height = (bbox[3] - bbox[1]) / video_height
-                        
-                        # class_id = 0 for abandoned objects
-                        f.write(f"0 {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n")
+                        frame_id = event['frame_id'] # Assuming frame_id is available in the event
+
+                        # class_id = 0 for abandoned objects, add frame id
+                        f.write(f"0 {frame_id} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n")
                 
                 print(f"Results saved to: {output_txt_path} ({len(abandoned_objects_log)} abandoned events)")
                 
