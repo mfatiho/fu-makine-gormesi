@@ -11,9 +11,9 @@ from ultralytics import YOLO, RTDETR, NAS
 DEFAULT_TARGET_CLASSES = ["backpack", "handbag", "suitcase"]
 DEFAULT_PERSON_CLASS = "person"
 DEFAULT_MASK_DECAY = 1
-DEFAULT_MASK_INIT = 128
+DEFAULT_MASK_INIT = 64
 DEFAULT_MASK_THRESH = 0
-DEFAULT_STATIONARY_IOU = 0.75
+DEFAULT_STATIONARY_IOU = 0.50
 DEFAULT_FPS = 10.0
 
 # --- Helper Functions ---
@@ -293,6 +293,7 @@ class AbandonmentDetector:
                         self.candidate_objects[track_id].last_seen_frame = processed_frame_num
                         self.candidate_objects[track_id].bbox = current_bbox
                 else:
+                    print(f"Candidate Abandoned Object: {obj.class_name} ID:{obj.track_id}")
                     if track_id in self.candidate_objects:
                         candidate = self.candidate_objects[track_id]
                         if not candidate.is_confirmed:
