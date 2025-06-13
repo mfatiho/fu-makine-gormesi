@@ -48,15 +48,9 @@ class AppConfig:
     stationary_check_window_duration_sec: float = 1.0
     stationary_check_min_presence_ratio: float = 0.7 # Min % of frames object must be present in window
     stationary_iou_threshold: float = 0.75
-    abandonment_duration_sec: float = 5.0 # General abandonment timer
-
-    # New: Person-related abandonment config
-    person_class_name: str = "person"
-    person_association_distance_threshold_pixels: int = 75 # How close a person needs to be to an object
-    person_disappearance_timeout_seconds: float = 3.0 # How long person can be gone before association is broken
-    abandonment_after_person_leaves_duration_seconds: float = 1.0 # How long object must be stationary AFTER person confirmed left
     
-    # New: Mask-related config
+    # Person-related config
+    person_class_name: str = "person"
     mask_decay_rate: int = 1  # How much to decrease mask values each frame
     mask_initial_value: int = 128  # Initial value for person mask
     mask_threshold: int = 0  # Threshold for considering mask as active
@@ -68,19 +62,13 @@ class AppConfig:
     min_frames_initial_movement_check: int = field(init=False)
     stationary_check_window_frames: int = field(init=False)
     stationary_check_min_samples_in_window: int = field(init=False)
-    abandonment_duration_frames: int = field(init=False)
-    person_disappearance_timeout_frames: int = field(init=False)
-    abandonment_after_person_leaves_duration_frames: int = field(init=False)
-    display_video: bool = False # New parameter for controlling display
+    display_video: bool = False
 
     def __post_init__(self):
         self.history_len_frames = int(self.target_fps * self.history_len_seconds)
         self.min_frames_initial_movement_check = int(self.target_fps * self.min_frames_initial_movement_check_seconds)
         self.stationary_check_window_frames = int(self.target_fps * self.stationary_check_window_duration_sec)
         self.stationary_check_min_samples_in_window = int(self.stationary_check_window_frames * self.stationary_check_min_presence_ratio)
-        self.abandonment_duration_frames = 5 #int(self.target_fps * self.abandonment_duration_sec) // 10
-        self.person_disappearance_timeout_frames = int(self.target_fps * self.person_disappearance_timeout_seconds)
-        self.abandonment_after_person_leaves_duration_frames = int(self.target_fps * self.abandonment_after_person_leaves_duration_seconds)
 
 # --- Detection Model ---
 class DetectionModel:
@@ -122,7 +110,8 @@ class TrackedObject:
         
         self.bboxes = collections.deque(maxlen=config.history_len_frames)
         self.centroids = collections.deque(maxlen=config.history_len_frames)
-        self.frames_seen_in = collections.deque(maxlen=config.history_len_frames) # Processed frame numbers
+        self.frames_seen_in = collections.deque(maxlen=config.history_len_frames)
+        self.class_names = collections.deque(maxlen=config.history_len_frames)  # Store class names for each frame
 
         self.last_seen_frame = first_seen_frame
         self.first_seen_frame = first_seen_frame
@@ -131,30 +120,32 @@ class TrackedObject:
         self.has_moved_significantly = False
         
         self.is_currently_stationary = False
-        self.stationary_since_frame = None # Processed frame number when current stationary period started
+        self.stationary_since_frame = None
         self.is_abandoned = False
-        self.abandoned_at_frame: int | None = None # New: Store frame when marked abandoned
-        self.abandoned_at_real_frame: int | None = None # New: Store frame when marked abandoned
-        self.abandoned_bbox: list | None = None    # New: Store bbox when marked abandoned
-        self.abandoned_reason: str | None = None   # New: Store reason
-        self.display_label = class_name # Default label
+        self.abandoned_at_frame: int | None = None
+        self.abandoned_at_real_frame: int | None = None
+        self.abandoned_bbox: list | None = None
+        self.abandoned_reason: str | None = None
+        self.display_label = class_name
 
-        self.abandoned_counter = 0  # How many frames object has been in abandoned state
-        self.abandoned_max_frames = int(self.config.target_fps * 2)  # Max frames to keep as abandoned
+        self.abandoned_max_frames = int(self.config.target_fps)
+        self.last_seen_while_abandoned = None
 
-        self.update_history(initial_bbox, initial_centroid, first_seen_frame)
+        self.update_history(initial_bbox, initial_centroid, first_seen_frame, class_name)
 
-    def update_history(self, bbox, centroid, processed_frame_num: int):
+    def update_history(self, bbox, centroid, processed_frame_num: int, class_name: str):
         self.bboxes.append(bbox)
         self.centroids.append(centroid)
         self.frames_seen_in.append(processed_frame_num)
+        self.class_names.append(class_name)  # Store the class name for this frame
         self.last_seen_frame = processed_frame_num
+        self.class_name = class_name  # Update current class name
 
         if not self.has_moved_significantly:
             self.initial_centroids_for_movement_check.append(centroid)
 
     def check_initial_movement(self):
-        if self.has_moved_significantly: # Already confirmed
+        if self.has_moved_significantly:
             return True
         
         if len(self.initial_centroids_for_movement_check) == self.config.min_frames_initial_movement_check:
@@ -163,49 +154,52 @@ class TrackedObject:
             if euclidean_distance(first_c, last_c) > self.config.initial_movement_centroid_threshold_pixels:
                 self.has_moved_significantly = True
                 print(f"Object ID {self.track_id} ({self.class_name}) confirmed to have moved significantly.")
-            # Clear after check to prevent re-check or continuous growth if logic changes
             self.initial_centroids_for_movement_check.clear()
         return self.has_moved_significantly
 
-    def check_stationarity(self, current_processed_frame: int):
+    def check_stationarity(self, current_frame: int):
         if not self.has_moved_significantly:
-            return False # Cannot be stationary for abandonment if it hasn't moved first
+            return False
 
-        window_bboxes = []
-        window_frames = []
-        for i in range(len(self.frames_seen_in) - 1, -1, -1):
-            frame_in_hist = self.frames_seen_in[i]
-            if current_processed_frame - frame_in_hist < self.config.stationary_check_window_frames:
-                window_frames.append(frame_in_hist)
-                window_bboxes.append(self.bboxes[i])
-            else:
-                break
-        window_bboxes.reverse()
-        window_frames.reverse()
-
-        is_stationary_this_check = False
-        if len(window_bboxes) >= self.config.stationary_check_min_samples_in_window:
-            # Compare current bbox (latest in window_bboxes) with earliest bbox in that window
-            current_bbox_in_hist = self.bboxes[-1] # Should be same as window_bboxes[-1]
-            earliest_bbox_in_window = window_bboxes[0]
-            
-            iou = calculate_iou(current_bbox_in_hist, earliest_bbox_in_window)
-            if iou >= self.config.stationary_iou_threshold:
-                is_stationary_this_check = True
-
-        if is_stationary_this_check:
-            self.is_currently_stationary = True
-            if self.stationary_since_frame is None: # Start of new stationary period
-                self.stationary_since_frame = window_frames[0] # Frame when this period started
-                print(f"Object ID {self.track_id} ({self.class_name}) started stationary period at frame {self.stationary_since_frame}.")
-        else: # Not stationary in this check, or not enough samples
+        if not self.bboxes:
             self.is_currently_stationary = False
             self.stationary_since_frame = None
-            # If it moves, it's no longer considered for current abandonment period
-            if not self.is_abandoned: # Don't reset label if already marked abandoned
-                 self.display_label = self.class_name
-        
+            return False
+
+        if len(self.bboxes) < 2:
+            return False
+
+        current_bbox = self.bboxes[-1]
+        prev_bbox = self.bboxes[-2]
+        iou = calculate_iou(current_bbox, prev_bbox)
+
+        if iou >= self.config.stationary_iou_threshold:
+            if not self.is_currently_stationary:
+                self.is_currently_stationary = True
+                self.stationary_since_frame = current_frame
+        else:
+            self.is_currently_stationary = False
+            self.stationary_since_frame = None
+
         return self.is_currently_stationary
+
+    def update_abandoned_state(self, current_frame: int):
+        if self.is_abandoned:
+            if self.bboxes:  # Object is visible
+                self.last_seen_while_abandoned = current_frame
+            elif self.last_seen_while_abandoned is not None:
+                # Object is not visible, check if we should remove abandoned state
+                frames_not_seen = current_frame - self.last_seen_while_abandoned
+                if frames_not_seen >= self.abandoned_max_frames:
+                    # Reset abandoned state
+                    self.is_abandoned = False
+                    self.abandoned_at_frame = None
+                    self.abandoned_at_real_frame = None
+                    self.abandoned_bbox = None
+                    self.abandoned_reason = None
+                    self.display_label = self.class_name
+                    self.last_seen_while_abandoned = None
+                    print(f"Object ID {self.track_id} ({self.class_name}) no longer marked as abandoned after {frames_not_seen} frames not seen")
 
     def mark_as_abandoned(self, frame_num: int, real_processed_frame: int, reason: str):
         if not self.is_abandoned: # Mark only once
@@ -214,68 +208,34 @@ class TrackedObject:
             self.abandoned_at_real_frame = real_processed_frame
             self.abandoned_bbox = self.get_current_bbox() # Capture current bbox
             self.abandoned_reason = reason
-            self.display_label = f"ABANDONED ({reason}) {self.class_name}"
-            self.abandoned_counter = 0
+            self.display_label = f"ABANDONED ({reason}) {self.class_name} ID:{self.track_id}"
+            self.last_seen_while_abandoned = frame_num  # Initialize last seen frame
             print(f"!!! Object ID {self.track_id} ({self.class_name}) marked as ABANDONED at frame {frame_num} (Reason: {reason}) !!!")
-
-    def update_abandoned_state(self):
-        if self.is_abandoned:
-            self.abandoned_counter += 1
-            if self.abandoned_counter >= self.abandoned_max_frames:
-                # Reset abandoned state, allow re-abandonment
-                self.is_abandoned = False
-                self.abandoned_at_frame = None
-                self.abandoned_at_real_frame = None
-                self.abandoned_bbox = None
-                self.abandoned_reason = None
-                self.display_label = self.class_name
-                self.abandoned_counter = 0
-
-    def check_abandonment(self, current_processed_frame: int, real_processed_frame: int | None = None):
-        if self.is_abandoned: return True
-        if not self.is_currently_stationary: return False # Must be stationary for any abandonment rule based on it
-
-        # Rule 1: Standard stationary timer (long duration)
-        if self.stationary_since_frame is not None and \
-           (current_processed_frame - self.stationary_since_frame) >= self.config.abandonment_duration_frames:
-            self.mark_as_abandoned(current_processed_frame, real_processed_frame, "timer")
-            return True
-
-        # Rule 2: Person departed, and object stationary for a (potentially shorter) period since person departure
-        if self.associated_person_id is not None and \
-           self.person_confirmed_departed_since_frame is not None and \
-           self.stationary_since_frame is not None:
-            
-            # Effective start of "abandonment after person left" check:
-            # When the object became stationary OR when the person was confirmed departed, WHICHEVER IS LATER.
-            # The object must have been stationary for the required duration *since* this effective start.
-            effective_check_start_frame = max(self.stationary_since_frame, self.person_confirmed_departed_since_frame)
-
-            if (current_processed_frame - effective_check_start_frame) >= self.config.abandonment_after_person_leaves_duration_frames:
-                self.mark_as_abandoned(current_processed_frame, real_processed_frame, "person_left")
-                return True
-            
-        return False
 
     def get_current_bbox(self):
         return self.bboxes[-1] if self.bboxes else None
-    
-    def get_display_info(self, confidence=None):
-        label_text = None # Default to no label
-        color = (0, 255, 0) # Default green
 
-        if self.is_abandoned:
-            label_text = f"{self.display_label} ID:{self.track_id}" # self.display_label is already set by mark_as_abandoned
-            color = (0, 0, 255) # Red for abandoned
-        elif self.is_currently_stationary and self.has_moved_significantly:
-            color = (0, 255, 255) # Yellow for stationary (but no label text)
-        # Else, color remains green (for actively tracked, non-stationary, non-abandoned)
+    def get_current_class_name(self):
+        return self.class_names[-1] if self.class_names else self.class_name
 
-        # Always show class name and track_id if display_video is enabled
-        if self.config.display_video and label_text is None:
-            label_text = f"{self.class_name} ID:{self.track_id}"
+    def get_display_info(self, confidence: float | None = None):
+        if not self.bboxes:
+            return None, None, None
+
+        bbox = self.bboxes[-1]
+        current_class = self.get_current_class_name()
         
-        return self.get_current_bbox(), label_text, color
+        if self.is_abandoned:
+            label = f"ID:{self.track_id}, ABANDONED ({self.abandoned_reason}) {current_class}"
+        else:
+            label = f" ID:{self.track_id} {current_class}"
+            
+        if confidence is not None:
+            label = f"{label} {confidence:.2f}"
+
+        # Default color is green, red for abandoned
+        color = (0, 255, 0) if not self.is_abandoned else (0, 0, 255)
+        return bbox, label, color
 
 # --- Abandonment Detector ---
 @dataclass
@@ -376,8 +336,7 @@ class AbandonmentDetector:
                     self.tracked_objects[track_id] = TrackedObject(track_id, class_name, bbox, centroid, processed_frame_num, self.config)
                 else:
                     obj = self.tracked_objects[track_id]
-                    obj.class_name = class_name # Tracker might re-ID with a different class
-                    obj.update_history(bbox, centroid, processed_frame_num)
+                    obj.update_history(bbox, centroid, processed_frame_num, class_name)  # Pass current class name
         
         # --- Logic Application ---
         for track_id, obj in list(self.tracked_objects.items()): 
@@ -444,7 +403,7 @@ class AbandonmentDetector:
                         "reason": obj.abandoned_reason
                     }
                     self.abandoned_events_log.append(log_entry)
-                obj.update_abandoned_state()
+                obj.update_abandoned_state(processed_frame_num)  # Pass current frame number
             
             # Clean up old target objects not seen for a very long time AND not abandoned
             if not is_seen_this_frame and not obj.is_abandoned and \
@@ -548,7 +507,7 @@ class VideoProcessor:
                     colored_mask[..., 2] = (mask_normalized * 255).astype(np.uint8)  # Red channel
                     
                     # Alpha blending
-                    alpha = 0.3  # Adjust this value to change mask transparency
+                    alpha = 0.5  # Adjust this value to change mask transparency
                     output_frame = cv2.addWeighted(output_frame, 1, colored_mask, alpha, 0)
 
                 for track_id, obj_instance in self.abandonment_handler.tracked_objects.items():
