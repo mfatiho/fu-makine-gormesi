@@ -1,7 +1,3 @@
-Elbette, sunduğunuz veriler ve geliştirdiğimiz algoritma üzerine kurulu, akademik formata uygun bir makale taslağı hazırladım.
-
----
-
 ### **Video Gözetiminde Terk Edilmiş Nesne Tespiti için Mekansal-Zamansal Maske Tabanlı Bir Yaklaşım**
 
 **Özet**
