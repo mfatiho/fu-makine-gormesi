@@ -31,7 +31,7 @@ Bu projenin temel amacı, bir video akışında terk edilmiş nesneleri yüksek 
 - **Programlama Dili:** Python 3
 - **Kütüphaneler:**
     - **OpenCV:** Video işleme, okuma/yazma ve görselleştirme işlemleri.
-    - **Ultralytics:** YOLO, RTDETR, NAS gibi son teknoloji nesne tespiti ve takibi modellerini kullanmak için.
+    - **Ultralytics:** YOLO, RTDETR gibi son teknoloji nesne tespiti ve takibi modellerini kullanmak için.
     - **NumPy:** Yüksek performanslı sayısal hesaplamalar, özellikle "Person Mask" operasyonları için.
 
 ---

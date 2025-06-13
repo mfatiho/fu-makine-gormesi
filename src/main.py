@@ -293,7 +293,6 @@ class AbandonmentDetector:
                         self.candidate_objects[track_id].last_seen_frame = processed_frame_num
                         self.candidate_objects[track_id].bbox = current_bbox
                 else:
-                    print(f"Candidate Abandoned Object: {obj.class_name} ID:{obj.track_id}")
                     if track_id in self.candidate_objects:
                         candidate = self.candidate_objects[track_id]
                         if not candidate.is_confirmed:
