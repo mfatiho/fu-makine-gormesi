@@ -2,9 +2,9 @@
 
 **Özet**
 
-Bu çalışma, video gözetim sistemlerinde terk edilmiş nesnelerin tespiti (AOD) için yenilikçi bir mekansal-zamansal (spatiotemporal) yaklaşım sunmaktadır. Geleneksel sahip tabanlı izleme (owner-based tracking) yöntemlerinin karmaşık ve kalabalık sahnelerde yaşadığı zorlukların üstesinden gelmek amacıyla, "Person Mask" (Kişi Maskesi) adını verdiğimiz dinamik bir haritalama tekniği geliştirilmiştir. Bu teknik, kişilerin video sahnesindeki varlığını ve hareketlerini kısa süreli bir hafıza olarak tutar. Bir nesnenin terk edilme durumu, nesnenin durağanlığı ve bu dinamik kişi maskesi ile olan etkileşimine göre belirlenir. Yöntemimizin etkinliğini değerlendirmek için YOLOv10L, YOLOv11L, YOLOv12L ve RT-DETR-L dahil olmak üzere dört farklı nesne tespit modeli, 11 video içeren özel bir veri seti üzerinde test edilmiştir. Deney sonuçları, önerilen yaklaşımın uygulanabilirliğini göstermiş ve özellikle RT-DETR-L modelinin, %40.9 Precision ve %16.9 F1-Skoru ile diğer modellere kıyasla üstün bir performans sergilediğini ortaya koymuştur.
+Bu çalışma, video gözetim sistemlerinde terk edilmiş nesnelerin tespiti (AOD) için yenilikçi bir mekansal-zamansal (spatiotemporal) yaklaşım sunmaktadır. Geleneksel sahip tabanlı izleme (owner-based tracking) yöntemlerinin karmaşık ve kalabalık sahnelerde yaşadığı zorlukların üstesinden gelmek amacıyla, "Person Mask" (Kişi Maskesi) adını verdiğimiz dinamik bir haritalama tekniği geliştirilmiştir. Bu teknik, kişilerin video sahnesindeki varlığını ve hareketlerini kısa süreli bir hafıza olarak tutar. Bir nesnenin terk edilme durumu, nesnenin durağanlığı ve bu dinamik kişi maskesi ile olan etkileşimine göre belirlenir. Yöntemimizin etkinliğini değerlendirmek için YOLOv10L, YOLOv11L, YOLOv12L ve RT-DETR-L dahil olmak üzere dört farklı nesne tespit modeli, halka açık ABODA veri seti [1] üzerinde test edilmiştir. Deney sonuçları, önerilen yaklaşımın uygulanabilirliğini göstermiş ve özellikle RT-DETR-L modelinin, %40.9 Precision ve %16.9 F1-Skoru ile diğer modellere kıyasla üstün bir performans sergilediğini ortaya koymuştur.
 
-**Anahtar Kelimeler:** Terk Edilmiş Nesne Tespiti, Video Gözetim, Bilgisayarlı Görü, Person Mask, Derin Öğrenme, Nesne Takibi.
+**Anahtar Kelimeler:** Terk Edilmiş Nesne Tespiti, Video Gözetim, Bilgisayarlı Görü, Person Mask, Derin Öğrenme, Nesne Takibi, ABODA.
 
 ---
 
@@ -82,7 +82,7 @@ END PROCEDURE
 ### **3. Deneyler ve Kurulum**
 
 #### **3.1. Veri Seti**
-Deneyler, terk edilmiş nesne senaryolarını içeren 11 farklı video (`video1.avi` - `video11.avi`) üzerinde gerçekleştirilmiştir. Her video için zemin gerçekliği (ground truth) verileri, YOLO formatında `obj_train_data` klasöründe sağlanmıştır.
+Deneyler, terk edilmiş nesne tespiti için özel olarak oluşturulmuş halka açık bir veri seti olan **ABODA (Abandoned Object Dataset)** [1] üzerinde gerçekleştirilmiştir. Bu veri seti, kalabalık sahneler, belirgin aydınlatma değişiklikleri, gece sahneleri, iç ve dış mekanlar gibi AOD sistemleri için zorlayıcı olan çeşitli gerçek dünya senaryolarını içeren 11 video sekansından oluşmaktadır. Her video için zemin gerçekliği (ground truth) verileri, YOLO formatında sağlanmıştır.
 
 #### **3.2. Değerlendirilen Modeller**
 Sistemin farklı tespit omurgalarıyla performansını ölçmek için dört model test edilmiştir:
@@ -123,7 +123,7 @@ Aşağıdaki tablo, dört modelin 11 video üzerindeki performansını özetleme
 **Tartışma:**
 Sonuçlar, **RT-DETR-L** modelinin, test edilen diğer modellere göre bu görevde daha üstün bir performans sergilediğini açıkça göstermektedir. Özellikle ortalama **%40.9 Precision** ve **%16.9 F1-Score** ile en dengeli sonuçları vermiştir. YOLOv12L modelinin hiçbir videoda başarılı bir tespit yapamaması, modelin bu spesifik veri seti ve görev için uygun olmadığını veya ek ince ayar (fine-tuning) gerektirdiğini düşündürmektedir.
 
-RT-DETR-L'nin başarısı, Transformer tabanlı mimarisinin nesneleri daha tutarlı bir şekilde takip etme yeteneğinden kaynaklanıyor olabilir. Bu durum, durağanlık ve maske kesişimi analizlerimizin daha stabil çalışmasını sağlamaktadır. Metriklerin genel olarak düşük olması, veri setindeki senaryoların zorluğuna (örneğin, düşük ışık, oklüzyon, nesnelerin küçük olması) işaret etmektedir. Bazı videolarda (örn. video2, video3) hiçbir modelin başarılı olamaması, bu videoların özellikle zorlu senaryolar içerdiğini göstermektedir.
+RT-DETR-L'nin başarısı, Transformer tabanlı mimarisinin nesneleri daha tutarlı bir şekilde takip etme yeteneğinden kaynaklanıyor olabilir. Bu durum, durağanlık ve maske kesişimi analizlerimizin daha stabil çalışmasını sağlamaktadır. Metriklerin genel olarak düşük olması, ABODA veri setindeki senaryoların zorluğuna (örneğin, düşük ışık, oklüzyon, nesnelerin küçük olması) işaret etmektedir. Bazı videolarda (örn. video2, video3) hiçbir modelin başarılı olamaması, bu videoların özellikle zorlu senaryolar içerdiğini göstermektedir.
 
 ---
 
@@ -133,5 +133,11 @@ Bu çalışmada, terk edilmiş nesne tespiti için geleneksel yöntemlere altern
 
 Gelecek çalışmalar aşağıdaki alanlara odaklanabilir:
 1.  **Hiperparametre Optimizasyonu:** Maske bozunma oranı, başlangıç değeri ve IoU eşiği gibi parametrelerin daha sistematik bir şekilde optimize edilmesi.
-2.  **Model İnce Ayarı (Fine-tuning):** Kullanılan modellerin, göreve özel bir veri seti üzerinde ince ayarlanarak tespit doğruluğunun artırılması.
+2.  **Model İnce Ayarı (Fine-tuning):** Kullanılan modellerin, ABODA veri seti üzerinde ince ayarlanarak tespit doğruluğunun artırılması.
 3.  **Karmaşık Senaryo Yönetimi:** Bir nesnenin bir kişiden diğerine geçmesi gibi daha karmaşık sosyal etkileşimleri anlayabilecek mantıkların eklenmesi.
+
+---
+
+### **6. Referanslar**
+
+[1] ABODA: Abandoned Object Dataset. GitHub. [https://github.com/kevinlin311tw/ABODA](https://github.com/kevinlin311tw/ABODA)
