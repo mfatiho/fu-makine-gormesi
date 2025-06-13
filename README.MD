@@ -2,7 +2,7 @@
 
 **Özet**
 
-Bu çalışma, video gözetim sistemlerinde terk edilmiş nesnelerin tespiti (AOD) için yenilikçi bir mekansal-zamansal (spatiotemporal) yaklaşım sunmaktadır. Geleneksel sahip tabanlı izleme (owner-based tracking) yöntemlerinin karmaşık ve kalabalık sahnelerde yaşadığı zorlukların üstesinden gelmek amacıyla, "Person Mask" (Kişi Maskesi) adını verdiğimiz dinamik bir haritalama tekniği geliştirilmiştir. Bu teknik, kişilerin video sahnesindeki varlığını ve hareketlerini kısa süreli bir hafıza olarak tutar. Bir nesnenin terk edilme durumu, nesnenin durağanlığı ve bu dinamik kişi maskesi ile olan etkileşimine göre belirlenir. Yöntemimizin etkinliğini değerlendirmek için YOLOv10L, YOLOv11L, YOLOv12L ve RT-DETR-L dahil olmak üzere dört farklı nesne tespit modeli, halka açık ABODA veri seti [1] üzerinde test edilmiştir. Deney sonuçları, önerilen yaklaşımın uygulanabilirliğini göstermiş ve özellikle RT-DETR-L modelinin, %40.9 Precision ve %16.9 F1-Skoru ile diğer modellere kıyasla üstün bir performans sergilediğini ortaya koymuştur.
+Bu çalışma, video gözetim sistemlerinde terk edilmiş nesnelerin tespiti (AOD) için yenilikçi bir mekansal-zamansal (spatiotemporal) yaklaşım sunmaktadır. Geleneksel sahip tabanlı izleme (owner-based tracking) yöntemlerinin karmaşık ve kalabalık sahnelerde yaşadığı zorlukların üstesinden gelmek amacıyla, "Person Mask" (Kişi Maskesi) adını verdiğimiz dinamik bir haritalama tekniği geliştirilmiştir. Bu teknik, kişilerin video sahnesindeki varlığını ve hareketlerini kısa süreli bir hafıza olarak tutar. Bir nesnenin terk edilme durumu, nesnenin durağanlığı ve bu dinamik kişi maskesi ile olan etkileşimine göre belirlenir. Yöntemimizin etkinliğini değerlendirmek için YOLOv10L, YOLOv11L, YOLOv12L ve RT-DETR-L dahil olmak üzere dört farklı nesne tespit modeli, halka açık ABODA veri seti [1] üzerinde test edilmiştir. Deney sonuçları, önerilen yaklaşımın uygulanabilirliğini göstermiş ve özellikle RT-DETR-L modelinin, %40.9 Precision ve %16.9 F1-Skoru ile diğer modellere kıyasla üstün bir performans sergilediğini ortaya koymuştur. Projenin kaynak kodlarına GitHub üzerinden erişilebilir [2].
 
 **Anahtar Kelimeler:** Terk Edilmiş Nesne Tespiti, Video Gözetim, Bilgisayarlı Görü, Person Mask, Derin Öğrenme, Nesne Takibi, ABODA.
 
@@ -141,3 +141,5 @@ Gelecek çalışmalar aşağıdaki alanlara odaklanabilir:
 ### **6. Referanslar**
 
 [1] ABODA: Abandoned Object Dataset. GitHub. [https://github.com/kevinlin311tw/ABODA](https://github.com/kevinlin311tw/ABODA)
+
+[2] O, M. F. (2024). *fu-makine-gormesi*. GitHub. [https://github.com/mfatiho/fu-makine-gormesi](https://github.com/mfatiho/fu-makine-gormesi) 
