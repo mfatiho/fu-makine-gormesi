@@ -18,16 +18,22 @@ MODEL_CONFIGS = [
 # Common video extensions
 VIDEO_EXTENSIONS = ['*.mp4', '*.avi', '*.mkv', '*.mov', '*.wmv']
 
-def run_test(videos_directory: str, results_base_dir: str = "results", model_name: str = ""):
-    if not os.path.isdir(videos_directory):
-        print(f"Error: Videos directory not found at {videos_directory}")
+def run_test(videos_directory: str, results_base_dir: str = "results", model_name: str = "", display_video: bool = False):
+    if not os.path.isdir(videos_directory) and not os.path.isfile(videos_directory):
+        print(f"Error: Videos directory or file not found at {videos_directory}")
         return
 
     os.makedirs(results_base_dir, exist_ok=True)
 
     video_files = []
-    for ext in VIDEO_EXTENSIONS:
-        video_files.extend(glob.glob(os.path.join(videos_directory, ext)))
+    if os.path.isdir(videos_directory):
+        for ext in VIDEO_EXTENSIONS:
+            video_files.extend(glob.glob(os.path.join(videos_directory, ext)))
+    elif os.path.isfile(videos_directory):
+        video_files = [videos_directory]
+    else:
+        print(f"Error: {videos_directory} is not a valid directory or file")
+        return
     
     if not video_files:
         print(f"No video files found in {videos_directory}")
@@ -58,7 +64,7 @@ def run_test(videos_directory: str, results_base_dir: str = "results", model_nam
 
             # Configure AppConfig for testing (no display, etc.)
             # You might want to adjust other AppConfig defaults here if needed for specific tests
-            test_app_config = AppConfig(display_video=False) 
+            test_app_config = AppConfig(display_video=display_video) 
                                         # Add other overrides if necessary, e.g. target_fps for consistency
                                         # test_app_config.target_fps = 10 
                                         # test_app_config.__post_init__() # Recalculate frame counts if target_fps changes
@@ -93,10 +99,10 @@ def run_test(videos_directory: str, results_base_dir: str = "results", model_nam
                         center_y = ((bbox[1] + bbox[3]) / 2) / video_height
                         width = (bbox[2] - bbox[0]) / video_width
                         height = (bbox[3] - bbox[1]) / video_height
-                        frame_id = event['frame_id'] # Assuming frame_id is available in the event
+                        real_frame_id = event['real_frame_id'] # Assuming frame_id is available in the event
 
                         # class_id = 0 for abandoned objects, add frame id
-                        f.write(f"0 {frame_id} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n")
+                        f.write(f"0 {real_frame_id} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n")
                 
                 print(f"Results saved to: {output_txt_path} ({len(abandoned_objects_log)} abandoned events)")
                 
@@ -120,6 +126,7 @@ if __name__ == "__main__":
     parser.add_argument("--videos-dir", type=str, help="Directory containing video files to process.")
     parser.add_argument("--results-dir", type=str, default="results", help="Base directory to save test results.")
     parser.add_argument("--model", type=str, default="", help="Path to the model configurations file.")
+    parser.add_argument("--display-video", action="store_true", help="Display video during processing.")
     
     args = parser.parse_args()
-    run_test(args.videos_dir, args.results_dir, args.model) 
+    run_test(args.videos_dir, args.results_dir, args.model, args.display_video) 
